@@ -55,6 +55,23 @@ function AuthPage() {
     }
   }, [user, navigate, destination]);
 
+  // Se voltou do Google com ?code= e ainda não há user, aguarda a sessão
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has("code") && !window.location.hash.includes("access_token")) return;
+
+    let cancelled = false;
+    (async () => {
+      const { data } = await supabase.auth.getSession();
+      if (!cancelled && data.session) {
+        navigate({ to: destination, replace: true });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [destination, navigate]);
+
   useEffect(() => {
     if (authError) {
       toast.error(

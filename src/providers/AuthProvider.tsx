@@ -19,7 +19,7 @@ type AuthProviderProps = {
 };
 
 /**
- * Sessão global via Supabase (populado pelo Lovable Google OAuth).
+ * Sessão global via Supabase Auth (Google OAuth nativo).
  */
 export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter();
@@ -29,6 +29,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     let active = true;
 
+    // Após redirect do Google, o Supabase troca ?code= pela sessão (PKCE)
     supabase.auth.getSession().then(({ data }) => {
       if (!active) return;
       setSession(data.session);
