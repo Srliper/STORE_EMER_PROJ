@@ -16,6 +16,8 @@
 3. Client Secret: do Google Cloud
 4. Google Console redirect URI **obrigatória**:
    `https://hhvzklzxtpaieqdxkymq.supabase.co/auth/v1/callback`
-5. Supabase Redirect URLs:
+5. Supabase Redirect URLs (obrigatório — senão volta pra home sem login):
    - `http://localhost:5173/**`
    - `https://SEU-APP.vercel.app/**`
+   - `https://SEU-APP.vercel.app/auth/callback`
+6. Site URL no Supabase = `https://SEU-APP.vercel.app`

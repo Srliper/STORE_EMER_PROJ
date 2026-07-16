@@ -13,6 +13,7 @@ import { Route as PedidoConfirmadoRouteImport } from './routes/pedido-confirmado
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
 import { Route as AuthenticatedMinhaContaRouteImport } from './routes/_authenticated/minha-conta'
 import { Route as AuthenticatedMeusPedidosRouteImport } from './routes/_authenticated/meus-pedidos'
 import { Route as AuthenticatedAdminRouteRouteImport } from './routes/_authenticated/admin/route'
@@ -41,6 +42,11 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/callback',
+  path: '/callback',
+  getParentRoute: () => AuthRoute,
 } as any)
 const AuthenticatedMinhaContaRoute = AuthenticatedMinhaContaRouteImport.update({
   id: '/minha-conta',
@@ -96,11 +102,12 @@ const AuthenticatedAdminClientesRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/pedido-confirmado': typeof PedidoConfirmadoRoute
   '/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/meus-pedidos': typeof AuthenticatedMeusPedidosRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/admin/clientes': typeof AuthenticatedAdminClientesRoute
   '/admin/comissao': typeof AuthenticatedAdminComissaoRoute
   '/admin/equipe': typeof AuthenticatedAdminEquipeRoute
@@ -110,10 +117,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/pedido-confirmado': typeof PedidoConfirmadoRoute
   '/meus-pedidos': typeof AuthenticatedMeusPedidosRoute
   '/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/admin/clientes': typeof AuthenticatedAdminClientesRoute
   '/admin/comissao': typeof AuthenticatedAdminComissaoRoute
   '/admin/equipe': typeof AuthenticatedAdminEquipeRoute
@@ -125,11 +133,12 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
-  '/auth': typeof AuthRoute
+  '/auth': typeof AuthRouteWithChildren
   '/pedido-confirmado': typeof PedidoConfirmadoRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteRouteWithChildren
   '/_authenticated/meus-pedidos': typeof AuthenticatedMeusPedidosRoute
   '/_authenticated/minha-conta': typeof AuthenticatedMinhaContaRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/_authenticated/admin/clientes': typeof AuthenticatedAdminClientesRoute
   '/_authenticated/admin/comissao': typeof AuthenticatedAdminComissaoRoute
   '/_authenticated/admin/equipe': typeof AuthenticatedAdminEquipeRoute
@@ -146,6 +155,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/meus-pedidos'
     | '/minha-conta'
+    | '/auth/callback'
     | '/admin/clientes'
     | '/admin/comissao'
     | '/admin/equipe'
@@ -159,6 +169,7 @@ export interface FileRouteTypes {
     | '/pedido-confirmado'
     | '/meus-pedidos'
     | '/minha-conta'
+    | '/auth/callback'
     | '/admin/clientes'
     | '/admin/comissao'
     | '/admin/equipe'
@@ -174,6 +185,7 @@ export interface FileRouteTypes {
     | '/_authenticated/admin'
     | '/_authenticated/meus-pedidos'
     | '/_authenticated/minha-conta'
+    | '/auth/callback'
     | '/_authenticated/admin/clientes'
     | '/_authenticated/admin/comissao'
     | '/_authenticated/admin/equipe'
@@ -185,7 +197,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
-  AuthRoute: typeof AuthRoute
+  AuthRoute: typeof AuthRouteWithChildren
   PedidoConfirmadoRoute: typeof PedidoConfirmadoRoute
 }
 
@@ -218,6 +230,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/_authenticated/minha-conta': {
       id: '/_authenticated/minha-conta'
@@ -324,10 +343,20 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface AuthRouteChildren {
+  AuthCallbackRoute: typeof AuthCallbackRoute
+}
+
+const AuthRouteChildren: AuthRouteChildren = {
+  AuthCallbackRoute: AuthCallbackRoute,
+}
+
+const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
-  AuthRoute: AuthRoute,
+  AuthRoute: AuthRouteWithChildren,
   PedidoConfirmadoRoute: PedidoConfirmadoRoute,
 }
 export const routeTree = rootRouteImport

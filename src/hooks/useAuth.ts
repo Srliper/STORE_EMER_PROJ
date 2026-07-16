@@ -37,7 +37,7 @@ export function useAuth(): UseAuthReturn {
 
     try {
       const next = callbackUrl?.startsWith("/") ? callbackUrl : "/";
-      const redirectTo = `${window.location.origin}/auth?callbackUrl=${encodeURIComponent(next)}`;
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`;
 
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
