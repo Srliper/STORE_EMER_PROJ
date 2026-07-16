@@ -1,7 +1,7 @@
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery } from "@tanstack/react-query";
-import { checkIsAdmin, bootstrapAdmin } from "@/lib/admin.functions";
+import { checkIsAdmin } from "@/lib/admin.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { LayoutDashboard, ShoppingBag, Package, Users, UserCog, LogOut, Store, Percent } from "lucide-react";
@@ -14,10 +14,9 @@ export const Route = createFileRoute("/_authenticated/admin")({
 function AdminLayout() {
   const { signOut } = useAuth();
   const fn = useServerFn(checkIsAdmin);
-  const bootstrap = useServerFn(bootstrapAdmin);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ["is-admin"],
     queryFn: () => fn(),
   });
@@ -36,24 +35,17 @@ function AdminLayout() {
         <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
           <h1 className="text-2xl font-display font-bold mb-3">Área Administrativa</h1>
           <p className="text-sm opacity-70 mb-6">
-            Acesso liberado para o dono <strong>emerstore385@gmail.com</strong> e o gestor{" "}
-            <strong>luisferbedim123@gmail.com</strong> (comissão 10%). Entre com uma dessas
-            contas Google. Se já estiver logado com a conta certa, clique abaixo.
+            Entre com a conta Google do <strong>dono</strong> (Emerson — emerstore385@gmail.com)
+            ou do <strong>gestor</strong> (Luis Fernando Bedim — luisferbedim123@gmail.com). O
+            acesso ao Admin aparece automaticamente após o login.
           </p>
-          <button
-            onClick={async () => {
-              try {
-                await bootstrap();
-                toast.success("Acesso administrativo liberado!");
-                refetch();
-              } catch (e: any) {
-                toast.error(e?.message ?? "Falha ao promover.");
-              }
-            }}
-            className="bg-brand text-primary-foreground px-6 py-3 rounded-full font-bold uppercase tracking-tight text-sm w-full mb-3 hover:scale-[1.02] transition-transform"
+          <Link
+            to="/auth"
+            search={{ callbackUrl: "/admin" }}
+            className="inline-flex bg-brand text-primary-foreground px-6 py-3 rounded-full font-bold uppercase tracking-tight text-sm w-full mb-3 justify-center hover:scale-[1.02] transition-transform"
           >
-            Liberar meu acesso admin
-          </button>
+            Entrar com Google
+          </Link>
           <Link
             to="/"
             className="block text-xs uppercase tracking-tight opacity-60 hover:opacity-100"

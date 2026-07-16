@@ -1,16 +1,34 @@
 /**
- * Contas com acesso ao painel Admin (Emerson Store).
- * Comissão do gestor: 10% por produto (sobre receita de pedidos pagos).
+ * Acesso definitivo ao painel Admin — Emerson Store.
+ * Só logar com Google nessas contas já libera o Admin (sem promoção manual).
  */
 export const ADMIN_OWNER_EMAIL = "emerstore385@gmail.com";
-export const ADMIN_GESTOR_EMAIL = "luisferbedim123@gmail.com";
+export const ADMIN_OWNER_NAME = "Emerson";
 
-/** Taxa de comissão do gestor (10% por produto) */
+export const ADMIN_GESTOR_EMAIL = "luisferbedim123@gmail.com";
+export const ADMIN_GESTOR_NAME = "Luis Fernando Bedim";
+
+/** Comissão do gestor: 10% por produto (também usada no painel do dono). */
 export const GESTOR_COMMISSION_RATE = 0.1;
 
 export const ADMIN_ALLOWLIST = [
   ADMIN_OWNER_EMAIL.toLowerCase(),
   ADMIN_GESTOR_EMAIL.toLowerCase(),
+] as const;
+
+export const ADMIN_TEAM = [
+  {
+    email: ADMIN_OWNER_EMAIL,
+    nome: ADMIN_OWNER_NAME,
+    papel: "dono" as const,
+    commissionRate: GESTOR_COMMISSION_RATE,
+  },
+  {
+    email: ADMIN_GESTOR_EMAIL,
+    nome: ADMIN_GESTOR_NAME,
+    papel: "gestor" as const,
+    commissionRate: GESTOR_COMMISSION_RATE,
+  },
 ] as const;
 
 export type AdminRole = "owner" | "gestor" | null;

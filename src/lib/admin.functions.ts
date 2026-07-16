@@ -401,12 +401,29 @@ export const listarFuncionarios = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
-    const { data: roles, error } = await supabase
-      .from("user_roles")
-      .select("user_id,role,created_at")
-      .eq("role", "admin");
-    if (error) throw new Error(error.message);
-    const ids = (roles ?? []).map((r: any) => r.user_id);
+
+    const { ADMIN_TEAM, normalizeEmail: norm } = await import("@/lib/admin-access");
+
+    // Prefer service role para listar roles (bypassa RLS)
+    let roles: any[] = [];
+    try {
+      const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+      const { data, error } = await supabaseAdmin
+        .from("user_roles")
+        .select("user_id,role,created_at")
+        .eq("role", "admin");
+      if (error) throw error;
+      roles = data ?? [];
+    } catch {
+      const { data, error } = await supabase
+        .from("user_roles")
+        .select("user_id,role,created_at")
+        .eq("role", "admin");
+      if (error) throw new Error(error.message);
+      roles = data ?? [];
+    }
+
+    const ids = roles.map((r: any) => r.user_id);
     let profilesMap: Record<string, any> = {};
     if (ids.length) {
       const { data: profs } = await supabase
@@ -415,14 +432,23 @@ export const listarFuncionarios = createServerFn({ method: "GET" })
         .in("id", ids);
       (profs ?? []).forEach((p: any) => (profilesMap[p.id] = p));
     }
-    return {
-      admins: (roles ?? []).map((r: any) => ({
+
+    const permanentes = ADMIN_TEAM.map((m) => ({
+      ...m,
+      fixo: true as const,
+    }));
+
+    const extras = roles
+      .map((r: any) => ({
         user_id: r.user_id,
         created_at: r.created_at,
         nome: profilesMap[r.user_id]?.nome ?? "",
         email: profilesMap[r.user_id]?.email ?? "",
-      })),
-    };
+        fixo: false as const,
+      }))
+      .filter((a) => !ADMIN_TEAM.some((t) => norm(t.email) === norm(a.email)));
+
+    return { permanentes, admins: extras };
   });
 
 export const promoverAdmin = createServerFn({ method: "POST" })
@@ -431,19 +457,35 @@ export const promoverAdmin = createServerFn({ method: "POST" })
     z.object({ email: z.string().email() }).parse(d),
   )
   .handler(async ({ context, data }) => {
-    const { supabase, userId } = context;
-    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
-    const { data: profile, error } = await supabase
+    const { userId } = context;
+    await assertAdmin(
+      context.supabase,
+      userId,
+      context.claims as Record<string, unknown>,
+    );
+
+    const email = normalizeEmail(data.email);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const { data: profile, error } = await supabaseAdmin
       .from("profiles")
-      .select("id")
-      .eq("email", data.email)
+      .select("id,email")
+      .ilike("email", email)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    if (!profile) throw new Error("Nenhum usuário cadastrado com esse email.");
-    const { error: insErr } = await supabase
-      .from("user_roles")
-      .insert({ user_id: profile.id, role: "admin" });
-    if (insErr && !insErr.message.includes("duplicate")) throw new Error(insErr.message);
+    if (!profile) {
+      throw new Error(
+        "Nenhum usuário cadastrado com esse email. A pessoa precisa entrar na loja (Google) uma vez antes.",
+      );
+    }
+
+    const { error: insErr } = await supabaseAdmin.from("user_roles").upsert(
+      { user_id: profile.id, role: "admin" },
+      { onConflict: "user_id,role", ignoreDuplicates: true },
+    );
+    if (insErr && !insErr.message.toLowerCase().includes("duplicate")) {
+      throw new Error(insErr.message);
+    }
     return { ok: true };
   });
 
@@ -453,12 +495,25 @@ export const revogarAdmin = createServerFn({ method: "POST" })
     z.object({ user_id: z.string().uuid() }).parse(d),
   )
   .handler(async ({ context, data }) => {
-    const { supabase, userId } = context;
+    const { userId, supabase } = context;
     await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     if (data.user_id === userId) {
       throw new Error("Você não pode revogar seu próprio acesso admin.");
     }
-    const { error } = await supabase
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    // Não revogar dono/gestor definitivos
+    const { data: profile } = await supabaseAdmin
+      .from("profiles")
+      .select("email")
+      .eq("id", data.user_id)
+      .maybeSingle();
+    if (profile?.email && isAdminEmail(profile.email)) {
+      throw new Error("Não é possível revogar o dono ou o gestor definitivos.");
+    }
+
+    const { error } = await supabaseAdmin
       .from("user_roles")
       .delete()
       .eq("user_id", data.user_id)
