@@ -2,11 +2,13 @@ import { Link } from "@tanstack/react-router";
 import { User, Shield } from "lucide-react";
 import { CartButton } from "./CartButton";
 import { useAuth } from "@/hooks/useAuth";
+import { isAdminEmail } from "@/lib/admin-access";
 import logo from "@/assets/logo.png";
 
 export function StoreNav() {
   const { user } = useAuth();
   const signedIn = !!user;
+  const showAdmin = isAdminEmail(user?.email);
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-white/10">
@@ -26,7 +28,7 @@ export function StoreNav() {
           </a>
         </div>
         <div className="flex items-center gap-3">
-          {signedIn && (
+          {showAdmin && (
             <Link
               to="/admin"
               className="hidden sm:flex items-center gap-2 bg-brand/10 hover:bg-brand/20 border border-brand/40 text-brand px-4 py-2 rounded-full text-xs font-bold uppercase tracking-tight transition-colors"

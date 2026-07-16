@@ -36,13 +36,15 @@ function AdminLayout() {
         <div className="max-w-md w-full bg-white/5 border border-white/10 rounded-2xl p-8 text-center">
           <h1 className="text-2xl font-display font-bold mb-3">Área Administrativa</h1>
           <p className="text-sm opacity-70 mb-6">
-            Você não é administrador. Se este é o primeiro acesso ao painel, clique abaixo para configurar — funciona apenas enquanto não houver nenhum admin no sistema.
+            Acesso liberado para o dono <strong>emerstore385@gmail.com</strong> e o gestor{" "}
+            <strong>luisferbedim123@gmail.com</strong> (comissão 10%). Entre com uma dessas
+            contas Google. Se já estiver logado com a conta certa, clique abaixo.
           </p>
           <button
             onClick={async () => {
               try {
                 await bootstrap();
-                toast.success("Você agora é administrador!");
+                toast.success("Acesso administrativo liberado!");
                 refetch();
               } catch (e: any) {
                 toast.error(e?.message ?? "Falha ao promover.");
@@ -50,7 +52,7 @@ function AdminLayout() {
             }}
             className="bg-brand text-primary-foreground px-6 py-3 rounded-full font-bold uppercase tracking-tight text-sm w-full mb-3 hover:scale-[1.02] transition-transform"
           >
-            Tornar-me administrador
+            Liberar meu acesso admin
           </button>
           <Link
             to="/"

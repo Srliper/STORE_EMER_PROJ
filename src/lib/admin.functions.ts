@@ -1,30 +1,122 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import {
+  commissionRateForEmail,
+  getAdminRole,
+  isAdminEmail,
+  normalizeEmail,
+} from "@/lib/admin-access";
 
-async function assertAdmin(supabase: any, userId: string) {
+function emailFromClaims(claims: Record<string, unknown> | undefined): string {
+  if (!claims) return "";
+  const direct = claims.email;
+  if (typeof direct === "string" && direct) return normalizeEmail(direct);
+  const meta = claims.user_metadata;
+  if (meta && typeof meta === "object" && meta !== null && "email" in meta) {
+    return normalizeEmail(String((meta as { email?: string }).email ?? ""));
+  }
+  // JWT às vezes traz email em nested app_metadata
+  const app = claims.app_metadata;
+  if (app && typeof app === "object" && app !== null && "email" in app) {
+    return normalizeEmail(String((app as { email?: string }).email ?? ""));
+  }
+  return "";
+}
+
+async function resolveUserEmail(
+  supabase: any,
+  claims?: Record<string, unknown>,
+): Promise<string> {
+  const fromClaims = emailFromClaims(claims);
+  if (fromClaims) return fromClaims;
+  try {
+    const { data } = await supabase.auth.getUser();
+    return normalizeEmail(data.user?.email ?? "");
+  } catch {
+    return "";
+  }
+}
+
+
+/** Garante linha em user_roles para e-mails da allowlist (dono/gestor). */
+async function ensureAllowlistRole(userId: string) {
+  try {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { error } = await supabaseAdmin.from("user_roles").upsert(
+      { user_id: userId, role: "admin" },
+      { onConflict: "user_id,role", ignoreDuplicates: true },
+    );
+    if (error && !error.message.toLowerCase().includes("duplicate")) {
+      console.warn("[admin] ensureAllowlistRole:", error.message);
+    }
+  } catch (e) {
+    console.warn("[admin] ensureAllowlistRole falhou:", e);
+  }
+}
+
+async function assertAdmin(
+  supabase: any,
+  userId: string,
+  claims?: Record<string, unknown>,
+) {
+  const email = await resolveUserEmail(supabase, claims);
+  if (isAdminEmail(email)) {
+    await ensureAllowlistRole(userId);
+    return { email, role: getAdminRole(email) };
+  }
+
   const { data, error } = await supabase.rpc("has_role", {
     _user_id: userId,
     _role: "admin",
   });
   if (error) throw new Error(error.message);
   if (!data) throw new Error("Acesso negado: somente administradores.");
+  return { email, role: "gestor" as const };
 }
 
 export const checkIsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const email = await resolveUserEmail(
+      context.supabase,
+      context.claims as Record<string, unknown>,
+    );
+
+    if (isAdminEmail(email)) {
+      await ensureAllowlistRole(context.userId);
+      return {
+        isAdmin: true,
+        role: getAdminRole(email),
+        email,
+        commissionRate: commissionRateForEmail(email),
+      };
+    }
+
     const { data } = await context.supabase.rpc("has_role", {
       _user_id: context.userId,
       _role: "admin",
     });
-    return { isAdmin: !!data };
+    return {
+      isAdmin: !!data,
+      role: data ? ("gestor" as const) : null,
+      email,
+      commissionRate: data ? 0.1 : 0,
+    };
   });
 
 export const bootstrapAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { userId } = context;
+    const { userId, claims, supabase } = context;
+    const email = await resolveUserEmail(supabase, claims as Record<string, unknown>);
+
+    // Dono/gestor da allowlist sempre podem se promover
+    if (isAdminEmail(email)) {
+      await ensureAllowlistRole(userId);
+      return { ok: true, role: getAdminRole(email) };
+    }
+
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { count, error: cErr } = await supabaseAdmin
       .from("user_roles")
@@ -32,20 +124,27 @@ export const bootstrapAdmin = createServerFn({ method: "POST" })
       .eq("role", "admin");
     if (cErr) throw new Error(cErr.message);
     if ((count ?? 0) > 0) {
-      throw new Error("Já existe um administrador. Peça para ele te promover.");
+      throw new Error(
+        "Já existe um administrador. Peça para o dono (Emerson) ou o gestor te promoverem.",
+      );
     }
     const { error } = await supabaseAdmin
       .from("user_roles")
       .insert({ user_id: userId, role: "admin" });
     if (error) throw new Error(error.message);
-    return { ok: true };
+    return { ok: true, role: "gestor" as const };
   });
 
 export const adminStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    const access = await assertAdmin(
+      supabase,
+      userId,
+      context.claims as Record<string, unknown>,
+    );
+    const rate = commissionRateForEmail(access.email) || 0.1;
 
     const [pedidosRes, clientesRes, produtosRes] = await Promise.all([
       supabase.from("pedidos").select("total,status,created_at"),
@@ -84,7 +183,9 @@ export const adminStats = createServerFn({ method: "GET" })
       totalPedidos: pedidos.length,
       totalPendentes: pedidos.filter((p: any) => p.status === "pendente").length,
       faturamento,
-      comissao: faturamento * 0.1,
+      comissao: faturamento * rate,
+      commissionRate: rate,
+      role: access.role,
       vendasHoje,
       totalClientes: clientesRes.count ?? 0,
       totalProdutos: produtosRes.count ?? 0,
@@ -96,7 +197,12 @@ export const comissaoPorProduto = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    const access = await assertAdmin(
+      supabase,
+      userId,
+      context.claims as Record<string, unknown>,
+    );
+    const rate = commissionRateForEmail(access.email) || 0.1;
     const { data: pedidos, error } = await supabase
       .from("pedidos")
       .select("produtos,status,total,created_at")
@@ -117,7 +223,7 @@ export const comissaoPorProduto = createServerFn({ method: "GET" })
         const cur = agg.get(key) ?? { nome, qtd: 0, receita: 0, comissao: 0 };
         cur.qtd += qty;
         cur.receita += rec;
-        cur.comissao += rec * 0.1;
+        cur.comissao += rec * rate;
         agg.set(key, cur);
       }
     }
@@ -125,7 +231,9 @@ export const comissaoPorProduto = createServerFn({ method: "GET" })
     return {
       linhas,
       receitaTotal,
-      comissaoTotal: receitaTotal * 0.1,
+      comissaoTotal: receitaTotal * rate,
+      commissionRate: rate,
+      role: access.role,
       pedidosPagos: (pedidos ?? []).length,
     };
   });
@@ -134,7 +242,7 @@ export const listarPedidosAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     const { data, error } = await supabase
       .from("pedidos")
       .select("*")
@@ -157,7 +265,7 @@ export const atualizarPedido = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     const patch: any = {};
     if (data.status) patch.status = data.status;
     if (data.codigo_rastreio !== undefined) patch.codigo_rastreio = data.codigo_rastreio || null;
@@ -170,7 +278,7 @@ export const listarProdutosAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     const { data, error } = await supabase
       .from("produtos")
       .select("*")
@@ -198,7 +306,7 @@ export const upsertProduto = createServerFn({ method: "POST" })
   .inputValidator((d: unknown) => produtoSchema.parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     if (data.id) {
       const { id, ...patch } = data;
       const { error } = await supabase.from("produtos").update(patch).eq("id", id);
@@ -219,7 +327,7 @@ export const removerProduto = createServerFn({ method: "POST" })
   .inputValidator((d: { id: string }) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     const { error } = await supabase.from("produtos").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
     return { ok: true };
@@ -238,7 +346,7 @@ export const uploadImagemProduto = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     const cleanName = data.fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
     const path = `${userId}/${Date.now()}-${cleanName}`;
     const bytes = Uint8Array.from(atob(data.base64), (c) => c.charCodeAt(0));
@@ -257,7 +365,7 @@ export const listarClientesAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     const { data: profiles, error } = await supabase
       .from("profiles")
       .select("id,nome,email,telefone,created_at")
@@ -292,7 +400,7 @@ export const listarFuncionarios = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     const { data: roles, error } = await supabase
       .from("user_roles")
       .select("user_id,role,created_at")
@@ -324,7 +432,7 @@ export const promoverAdmin = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     const { data: profile, error } = await supabase
       .from("profiles")
       .select("id")
@@ -346,7 +454,7 @@ export const revogarAdmin = createServerFn({ method: "POST" })
   )
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
-    await assertAdmin(supabase, userId);
+    await assertAdmin(supabase, userId, context.claims as Record<string, unknown>);
     if (data.user_id === userId) {
       throw new Error("Você não pode revogar seu próprio acesso admin.");
     }
