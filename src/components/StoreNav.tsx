@@ -1,14 +1,29 @@
 import { Link } from "@tanstack/react-router";
 import { User, Shield } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQuery } from "@tanstack/react-query";
 import { CartButton } from "./CartButton";
 import { useAuth } from "@/hooks/useAuth";
 import { isAdminEmail } from "@/lib/admin-access";
+import { checkIsAdmin } from "@/lib/admin.functions";
 import logo from "@/assets/logo.png";
 
 export function StoreNav() {
-  const { user } = useAuth();
+  const { user, isReady } = useAuth();
   const signedIn = !!user;
-  const showAdmin = isAdminEmail(user?.email);
+  const checkAdmin = useServerFn(checkIsAdmin);
+
+  // Fallback: e-mail no cliente + confirmação no servidor (claims JWT)
+  const emailLooksAdmin = isAdminEmail(user?.email);
+  const { data: adminData } = useQuery({
+    queryKey: ["nav-is-admin", user?.id],
+    queryFn: () => checkAdmin(),
+    enabled: signedIn && isReady,
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  const showAdmin = emailLooksAdmin || !!adminData?.isAdmin;
 
   return (
     <nav className="sticky top-0 z-50 bg-background/80 backdrop-blur-md border-b border-white/10">
@@ -31,9 +46,10 @@ export function StoreNav() {
           {showAdmin && (
             <Link
               to="/admin"
-              className="hidden sm:flex items-center gap-2 bg-brand/10 hover:bg-brand/20 border border-brand/40 text-brand px-4 py-2 rounded-full text-xs font-bold uppercase tracking-tight transition-colors"
+              className="flex items-center gap-2 bg-brand/10 hover:bg-brand/20 border border-brand/40 text-brand px-3 sm:px-4 py-2 rounded-full text-xs font-bold uppercase tracking-tight transition-colors"
             >
-              <Shield className="size-4" /> Admin
+              <Shield className="size-4" />
+              <span className="hidden xs:inline sm:inline">Admin</span>
             </Link>
           )}
           {signedIn ? (
@@ -42,7 +58,7 @@ export function StoreNav() {
               className="flex items-center gap-2 bg-white/5 hover:bg-white/10 border border-white/10 px-4 py-2 rounded-full text-xs font-bold uppercase tracking-tight transition-colors"
             >
               <User className="size-4" />{" "}
-              <span className="hidden sm:inline">{user?.name ?? "Minha conta"}</span>
+              <span className="hidden sm:inline">{user?.name ?? user?.email ?? "Minha conta"}</span>
             </Link>
           ) : (
             <Link

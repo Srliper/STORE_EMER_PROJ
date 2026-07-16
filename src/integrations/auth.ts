@@ -12,11 +12,22 @@ export function mapSupabaseUser(user: {
   id: string;
   email?: string | null;
   user_metadata?: Record<string, unknown> | null;
+  identities?: Array<{ identity_data?: Record<string, unknown> | null }> | null;
 }): AuthUser {
   const meta = user.user_metadata ?? {};
+  const identityEmail = user.identities
+    ?.map((i) => i.identity_data?.email)
+    .find((e) => typeof e === "string");
+
+  const email =
+    user.email ||
+    (typeof meta.email === "string" ? meta.email : null) ||
+    (typeof identityEmail === "string" ? identityEmail : null) ||
+    null;
+
   return {
     id: user.id,
-    email: user.email ?? null,
+    email,
     name:
       (meta.full_name as string | undefined) ??
       (meta.name as string | undefined) ??
