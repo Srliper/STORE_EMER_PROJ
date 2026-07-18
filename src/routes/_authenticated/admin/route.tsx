@@ -60,7 +60,7 @@ function AdminLayout() {
   const links = [
     { to: "/admin", icon: LayoutDashboard, label: "Dashboard", exact: true },
     { to: "/admin/pedidos", icon: ShoppingBag, label: "Pedidos" },
-    { to: "/admin/comissao", icon: Percent, label: "Comissão" },
+    { to: "/admin/comissao", icon: Percent, label: "Participação" },
     { to: "/admin/produtos", icon: Package, label: "Produtos" },
     { to: "/admin/clientes", icon: Users, label: "Clientes" },
     { to: "/admin/equipe", icon: UserCog, label: "Equipe" },

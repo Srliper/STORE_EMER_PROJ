@@ -46,7 +46,9 @@ export const criarPedido = createServerFn({ method: "POST" })
   .handler(async ({ context, data }) => {
     const { supabase, userId } = context;
     const subtotal = data.itens.reduce((s, it) => s + it.price * it.qty, 0);
-    const total = subtotal + data.frete.valor;
+    // Política da loja: frete sempre grátis (dono Emerson)
+    const freteValor = 0;
+    const total = subtotal;
 
     const { data: inserted, error } = await supabase
       .from("pedidos")
@@ -54,14 +56,14 @@ export const criarPedido = createServerFn({ method: "POST" })
         cliente_id: userId,
         produtos: data.itens,
         subtotal,
-        frete: data.frete.valor,
+        frete: freteValor,
         desconto: 0,
         total,
         status: "pendente",
         endereco_entrega: {
           ...data.endereco,
-          frete_servico: data.frete.servico,
-          frete_prazo_dias: data.frete.prazo,
+          frete_servico: "Entrega grátis",
+          frete_prazo_dias: data.frete.prazo || 5,
         },
         observacoes: data.observacoes ?? null,
       })

@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
+  GESTOR_COMMISSION_RATE,
   commissionRateForEmail,
   getAdminRole,
   isAdminEmail,
@@ -101,7 +102,7 @@ export const checkIsAdmin = createServerFn({ method: "GET" })
       isAdmin: !!data,
       role: data ? ("gestor" as const) : null,
       email,
-      commissionRate: data ? 0.1 : 0,
+      commissionRate: data ? GESTOR_COMMISSION_RATE : 0,
     };
   });
 
@@ -144,7 +145,7 @@ export const adminStats = createServerFn({ method: "GET" })
       userId,
       context.claims as Record<string, unknown>,
     );
-    const rate = commissionRateForEmail(access.email) || 0.1;
+    const rate = commissionRateForEmail(access.email) || GESTOR_COMMISSION_RATE;
 
     const [pedidosRes, clientesRes, produtosRes] = await Promise.all([
       supabase.from("pedidos").select("total,status,created_at"),
@@ -202,7 +203,7 @@ export const comissaoPorProduto = createServerFn({ method: "GET" })
       userId,
       context.claims as Record<string, unknown>,
     );
-    const rate = commissionRateForEmail(access.email) || 0.1;
+    const rate = commissionRateForEmail(access.email) || GESTOR_COMMISSION_RATE;
     const { data: pedidos, error } = await supabase
       .from("pedidos")
       .select("produtos,status,total,created_at")

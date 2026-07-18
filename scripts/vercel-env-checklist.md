@@ -14,10 +14,10 @@
 
 ## Admin definitivo (só logar)
 
-| Papel | Nome | Email | Comissão |
-|-------|------|-------|----------|
-| Dono | Emerson | `emerstore385@gmail.com` | 10% |
-| Gestor | Luis Fernando Bedim | `luisferbedim123@gmail.com` | 10% |
+| Papel | Nome | Email | Participação |
+|-------|------|-------|--------------|
+| Dono | Emerson | `emerstore385@gmail.com` | 90% |
+| Gestor | Luis Fernando Bedim | `luisferbedim123@gmail.com` | 10% (comissão) |
 
 Botão **Admin** aparece automaticamente após login com essas contas.
 

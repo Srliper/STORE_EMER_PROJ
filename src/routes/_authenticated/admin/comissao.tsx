@@ -20,24 +20,31 @@ function ComissaoPage() {
 
   if (isLoading || !data) return <p className="opacity-60">Carregando...</p>;
 
+  const pct = Math.round((data.commissionRate ?? 0) * 100);
+  const isOwner = data.role === "owner";
+  const title = isOwner ? "Sua parte (dono)" : "Minha comissão";
+  const subtitle = isOwner
+    ? "90% da receita das vendas (pedidos pagos, enviados ou entregues). O gestor recebe 10%."
+    : "10% sobre cada produto vendido (pedidos pagos, enviados ou entregues)";
+  const shareLabel = isOwner ? `Sua parte (${pct}%)` : `Comissão total (${pct}%)`;
+  const colLabel = isOwner ? `Sua parte (${pct}%)` : `Comissão (${pct}%)`;
+
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-display font-bold">Minha comissão</h1>
-        <p className="opacity-60 text-sm">
-          10% sobre cada produto vendido (pedidos pagos, enviados ou entregues)
-        </p>
+        <h1 className="text-3xl font-display font-bold">{title}</h1>
+        <p className="opacity-60 text-sm">{subtitle}</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card icon={DollarSign} label="Receita total" value={brl(data.receitaTotal)} />
-        <Card icon={Percent} label="Comissão total (10%)" value={brl(data.comissaoTotal)} accent />
+        <Card icon={Percent} label={shareLabel} value={brl(data.comissaoTotal)} accent />
         <Card icon={ShoppingBag} label="Pedidos pagos" value={String(data.pedidosPagos)} />
       </div>
 
       <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
         <div className="p-6 border-b border-white/10">
-          <h2 className="font-bold">Comissão por produto</h2>
+          <h2 className="font-bold">{isOwner ? "Parte por produto" : "Comissão por produto"}</h2>
         </div>
         <table className="w-full text-sm">
           <thead className="bg-white/5">
@@ -45,7 +52,7 @@ function ComissaoPage() {
               <th className="p-4 font-medium">Produto</th>
               <th className="p-4 font-medium text-right">Qtd vendida</th>
               <th className="p-4 font-medium text-right">Receita</th>
-              <th className="p-4 font-medium text-right">Comissão (10%)</th>
+              <th className="p-4 font-medium text-right">{colLabel}</th>
             </tr>
           </thead>
           <tbody>

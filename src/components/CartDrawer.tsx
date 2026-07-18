@@ -123,7 +123,7 @@ export function CartDrawer() {
               <span>Subtotal</span>
               <span>{formatBRL(total)}</span>
             </div>
-            <p className="text-[10px] opacity-50">Frete calculado na próxima etapa.</p>
+            <p className="text-[10px] opacity-50">Frete grátis — informe o endereço na próxima etapa.</p>
             <button
               onClick={irParaCheckout}
               className="w-full bg-brand text-primary-foreground rounded-full py-3.5 font-bold uppercase tracking-tight text-sm hover:scale-[1.02] transition-transform"

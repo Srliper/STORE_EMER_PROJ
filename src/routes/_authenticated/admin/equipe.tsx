@@ -48,7 +48,7 @@ function EquipeAdmin() {
       <div>
         <h1 className="text-3xl font-display font-bold">Equipe</h1>
         <p className="opacity-60 text-sm">
-          Dono e gestor têm acesso automático ao logar. Comissão do gestor: 10% por produto.
+          Dono e gestor têm acesso automático ao logar. Emerson (dono): 90%. Gestor: 10% por produto.
         </p>
       </div>
 
@@ -64,7 +64,7 @@ function EquipeAdmin() {
               <th className="p-4 font-medium">Nome</th>
               <th className="p-4 font-medium">Email</th>
               <th className="p-4 font-medium">Papel</th>
-              <th className="p-4 font-medium">Comissão</th>
+              <th className="p-4 font-medium">Participação</th>
             </tr>
           </thead>
           <tbody>
@@ -82,7 +82,10 @@ function EquipeAdmin() {
                 <td className="p-4 uppercase text-xs tracking-tight font-bold text-brand">
                   {m.papel}
                 </td>
-                <td className="p-4">{Math.round((m.commissionRate ?? 0.1) * 100)}%</td>
+                <td className="p-4">
+                  {Math.round((m.commissionRate ?? 0) * 100)}%
+                  {m.papel === "dono" ? " (dono)" : " (comissão)"}
+                </td>
               </tr>
             ))}
           </tbody>

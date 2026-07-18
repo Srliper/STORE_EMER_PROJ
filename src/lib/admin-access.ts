@@ -8,8 +8,9 @@ export const ADMIN_OWNER_NAME = "Emerson";
 export const ADMIN_GESTOR_EMAIL = "luisferbedim123@gmail.com";
 export const ADMIN_GESTOR_NAME = "Luis Fernando Bedim";
 
-/** Comissão do gestor: 10% por produto (também usada no painel do dono). */
+/** Gestor: 10% por produto. Dono (Emerson): 90% da receita — não é comissão. */
 export const GESTOR_COMMISSION_RATE = 0.1;
+export const OWNER_SHARE_RATE = 0.9;
 
 export const ADMIN_ALLOWLIST = [
   ADMIN_OWNER_EMAIL.toLowerCase(),
@@ -21,7 +22,7 @@ export const ADMIN_TEAM = [
     email: ADMIN_OWNER_EMAIL,
     nome: ADMIN_OWNER_NAME,
     papel: "dono" as const,
-    commissionRate: GESTOR_COMMISSION_RATE,
+    commissionRate: OWNER_SHARE_RATE,
   },
   {
     email: ADMIN_GESTOR_EMAIL,
@@ -51,6 +52,7 @@ export function getAdminRole(email?: string | null): AdminRole {
 
 export function commissionRateForEmail(email?: string | null): number {
   const role = getAdminRole(email);
-  if (role === "gestor" || role === "owner") return GESTOR_COMMISSION_RATE;
+  if (role === "owner") return OWNER_SHARE_RATE;
+  if (role === "gestor") return GESTOR_COMMISSION_RATE;
   return 0;
 }

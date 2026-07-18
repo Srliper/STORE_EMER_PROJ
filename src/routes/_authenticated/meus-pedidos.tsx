@@ -118,7 +118,9 @@ function MeusPedidosPage() {
                     ))}
                   </ul>
                   <div className="flex items-center justify-between pt-3 border-t border-white/10">
-                    <span className="text-xs opacity-60">Frete: R$ {p.frete.toFixed(2)}</span>
+                    <span className="text-xs opacity-60">
+                      Frete: {Number(p.frete) > 0 ? `R$ ${p.frete.toFixed(2)}` : "GRÁTIS"}
+                    </span>
                     <span className="font-bold text-lg">R$ {p.total.toFixed(2)}</span>
                   </div>
                   {p.codigo_rastreio && (

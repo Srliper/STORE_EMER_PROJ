@@ -18,6 +18,11 @@ function AdminDashboard() {
   if (isLoading || !data) return <p className="opacity-60">Carregando...</p>;
 
   const max = Math.max(1, ...data.ultimos7.map((d) => d.total));
+  const pct = Math.round((data.commissionRate ?? 0) * 100);
+  const shareLabel =
+    data.role === "owner"
+      ? `Sua parte (${pct}%)`
+      : `Minha comissão (${pct}%)`;
 
   return (
     <div className="space-y-8">
@@ -28,7 +33,7 @@ function AdminDashboard() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Stat icon={DollarSign} label="Faturamento" value={brl(data.faturamento)} />
-        <Stat icon={Percent} label="Minha comissão (10%)" value={brl(data.comissao ?? 0)} accent />
+        <Stat icon={Percent} label={shareLabel} value={brl(data.comissao ?? 0)} accent />
         <Stat icon={ShoppingBag} label="Vendas hoje" value={String(data.vendasHoje)} />
         <Stat icon={Clock} label="Pedidos pendentes" value={String(data.totalPendentes)} />
         <Stat icon={Users} label="Clientes" value={String(data.totalClientes)} />

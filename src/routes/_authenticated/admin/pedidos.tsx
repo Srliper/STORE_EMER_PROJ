@@ -135,7 +135,7 @@ function PedidosAdmin() {
                           </pre>
                           <div className="mt-3 space-y-1 opacity-80">
                             <div>Subtotal: {brl(Number(p.subtotal))}</div>
-                            <div>Frete: {brl(Number(p.frete))}</div>
+                            <div>Frete: GRÁTIS</div>
                             <div>Desconto: {brl(Number(p.desconto))}</div>
                             <div>Pagamento: {p.metodo_pagamento ?? "—"}</div>
                             {p.observacoes && <div>Obs: {p.observacoes}</div>}
