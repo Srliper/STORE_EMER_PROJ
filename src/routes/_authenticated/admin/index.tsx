@@ -21,8 +21,8 @@ function AdminDashboard() {
   const pct = Math.round((data.commissionRate ?? 0) * 100);
   const shareLabel =
     data.role === "owner"
-      ? `Sua parte (${pct}%)`
-      : `Minha comissão (${pct}%)`;
+      ? `Sua parte — dono (${pct}%)`
+      : `Comissão — gestor (${pct}%)`;
 
   return (
     <div className="space-y-8">

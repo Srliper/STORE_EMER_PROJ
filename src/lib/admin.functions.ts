@@ -3,10 +3,12 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import {
   GESTOR_COMMISSION_RATE,
+  OWNER_SHARE_RATE,
   commissionRateForEmail,
   getAdminRole,
   isAdminEmail,
   normalizeEmail,
+  type AdminRole,
 } from "@/lib/admin-access";
 
 function emailFromClaims(claims: Record<string, unknown> | undefined): string {
@@ -17,7 +19,6 @@ function emailFromClaims(claims: Record<string, unknown> | undefined): string {
   if (meta && typeof meta === "object" && meta !== null && "email" in meta) {
     return normalizeEmail(String((meta as { email?: string }).email ?? ""));
   }
-  // JWT às vezes traz email em nested app_metadata
   const app = claims.app_metadata;
   if (app && typeof app === "object" && app !== null && "email" in app) {
     return normalizeEmail(String((app as { email?: string }).email ?? ""));
@@ -28,15 +29,41 @@ function emailFromClaims(claims: Record<string, unknown> | undefined): string {
 async function resolveUserEmail(
   supabase: any,
   claims?: Record<string, unknown>,
+  userId?: string,
 ): Promise<string> {
   const fromClaims = emailFromClaims(claims);
   if (fromClaims) return fromClaims;
   try {
     const { data } = await supabase.auth.getUser();
-    return normalizeEmail(data.user?.email ?? "");
+    const authEmail = normalizeEmail(data.user?.email ?? "");
+    if (authEmail) return authEmail;
+    const metaEmail = normalizeEmail(
+      String((data.user?.user_metadata as { email?: string } | undefined)?.email ?? ""),
+    );
+    if (metaEmail) return metaEmail;
   } catch {
-    return "";
+    /* ignore */
   }
+  if (userId) {
+    try {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("email")
+        .eq("id", userId)
+        .maybeSingle();
+      const pe = normalizeEmail(prof?.email ?? "");
+      if (pe) return pe;
+    } catch {
+      /* ignore */
+    }
+  }
+  return "";
+}
+
+function shareRateForRole(role: AdminRole, email?: string | null): number {
+  if (role === "owner") return OWNER_SHARE_RATE;
+  if (role === "gestor") return GESTOR_COMMISSION_RATE;
+  return commissionRateForEmail(email);
 }
 
 
@@ -61,7 +88,7 @@ async function assertAdmin(
   userId: string,
   claims?: Record<string, unknown>,
 ) {
-  const email = await resolveUserEmail(supabase, claims);
+  const email = await resolveUserEmail(supabase, claims, userId);
   if (isAdminEmail(email)) {
     await ensureAllowlistRole(userId);
     return { email, role: getAdminRole(email) };
@@ -82,15 +109,17 @@ export const checkIsAdmin = createServerFn({ method: "GET" })
     const email = await resolveUserEmail(
       context.supabase,
       context.claims as Record<string, unknown>,
+      context.userId,
     );
 
     if (isAdminEmail(email)) {
       await ensureAllowlistRole(context.userId);
+      const role = getAdminRole(email);
       return {
         isAdmin: true,
-        role: getAdminRole(email),
+        role,
         email,
-        commissionRate: commissionRateForEmail(email),
+        commissionRate: shareRateForRole(role, email),
       };
     }
 
@@ -110,7 +139,7 @@ export const bootstrapAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { userId, claims, supabase } = context;
-    const email = await resolveUserEmail(supabase, claims as Record<string, unknown>);
+    const email = await resolveUserEmail(supabase, claims as Record<string, unknown>, userId);
 
     // Dono/gestor da allowlist sempre podem se promover
     if (isAdminEmail(email)) {
@@ -145,7 +174,7 @@ export const adminStats = createServerFn({ method: "GET" })
       userId,
       context.claims as Record<string, unknown>,
     );
-    const rate = commissionRateForEmail(access.email) || GESTOR_COMMISSION_RATE;
+    const rate = shareRateForRole(access.role, access.email);
 
     const [pedidosRes, clientesRes, produtosRes] = await Promise.all([
       supabase.from("pedidos").select("total,status,created_at"),
@@ -203,7 +232,7 @@ export const comissaoPorProduto = createServerFn({ method: "GET" })
       userId,
       context.claims as Record<string, unknown>,
     );
-    const rate = commissionRateForEmail(access.email) || GESTOR_COMMISSION_RATE;
+    const rate = shareRateForRole(access.role, access.email);
     const { data: pedidos, error } = await supabase
       .from("pedidos")
       .select("produtos,status,total,created_at")
@@ -234,6 +263,8 @@ export const comissaoPorProduto = createServerFn({ method: "GET" })
       receitaTotal,
       comissaoTotal: receitaTotal * rate,
       commissionRate: rate,
+      ownerShare: receitaTotal * OWNER_SHARE_RATE,
+      gestorShare: receitaTotal * GESTOR_COMMISSION_RATE,
       role: access.role,
       pedidosPagos: (pedidos ?? []).length,
     };
